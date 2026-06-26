@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hours">
+<meta name="theme-color" content="#FAF8F3">
+<link rel="manifest" href="data:application/json,{%22name%22:%22Hours%20Tracker%22,%22short_name%22:%22Hours%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23FAF8F3%22,%22theme_color%22:%22%23FAF8F3%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Crect%20width='192'%20height='192'%20rx='40'%20fill='%230F6B5C'/%3E%3Ctext%20x='96'%20y='130'%20font-size='110'%20text-anchor='middle'%20fill='white'%20font-family='system-ui'%3E%E2%8F%B1%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22}]}">
+<title>Hours Tracker</title>
+<style>
+  :root{
+    --paper:#FAF8F3;
+    --paper-raised:#FFFFFF;
+    --ink:#1C1C1A;
+    --ink-soft:#6B6657;
+    --rule:#E4E0D6;
+    --accent:#0F6B5C;
+    --accent-soft:#DCEFE9;
+    --warn:#C8762B;
+    --warn-soft:#F6E6D3;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  body{ padding-bottom:48px; }
+  .num{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---- sticky summary ---- */
+  .summary{
+    position:sticky; top:0; z-index:10;
+    background:var(--paper);
+    padding:14px 18px 10px;
+    border-bottom:1px solid var(--rule);
+  }
+  .summary-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .summary-top h1{ font-size:17px; margin:0; letter-spacing:0.2px; }
+  .summary-total{ font-size:22px; font-weight:600; }
+  .summary-total span{ font-size:13px; color:var(--ink-soft); font-weight:400; margin-left:4px; }
+  .meter{ height:10px; border-radius:6px; background:var(--rule); overflow:hidden; position:relative; }
+  .meter-fill{ height:100%; background:var(--accent); width:0%; transition:width .25s ease, background .25s ease; }
+  .meter-fill.over{ background:var(--warn); }
+  .meter-caption{ display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); margin-top:5px; }
+
+  /* ---- settings row ---- */
+  .settings{ display:flex; gap:10px; padding:14px 18px 6px; flex-wrap:wrap; }
+  .field{ flex:1; min-width:140px; }
+  .field label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px; }
+  .field input{
+    width:100%; font-size:16px; padding:9px 10px;
+    border:1px solid var(--rule); border-radius:8px;
+    background:var(--paper-raised); color:var(--ink); font-family:inherit;
+  }
+
+  /* ---- mode toggle ---- */
+  .seg{
+    display:flex; border:1px solid var(--rule); border-radius:10px;
+    overflow:hidden; margin:6px 18px 4px;
+  }
+  .seg-btn{
+    flex:1; padding:10px; background:var(--paper-raised); border:none;
+    font-size:14px; font-weight:600; color:var(--ink-soft); font-family:inherit;
+  }
+  .seg-btn + .seg-btn{ border-left:1px solid var(--rule); }
+  .seg-btn.active{ background:var(--ink); color:var(--paper); }
+
+  /* ---- week cards ---- */
+  main{ padding:6px 18px 0; }
+  .week{
+    background:var(--paper-raised); border:1px solid var(--rule);
+    border-radius:12px; margin-top:16px; overflow:hidden;
+  }
+  .week-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 14px; border-bottom:1px solid var(--rule);
+  }
+  .week-head h2{
+    font-size:14px; margin:0; text-transform:uppercase;
+    letter-spacing:0.6px; color:var(--ink-soft);
+  }
+  .week-head .week-total{ font-size:16px; font-weight:600; }
+  .ot-pill{
+    display:inline-block; font-size:11px; font-weight:600; color:var(--warn);
+    background:var(--warn-soft); border-radius:5px; padding:2px 6px;
+    margin-left:6px; vertical-align:1px;
+  }
+  .row{
+    display:flex; align-items:center; padding:10px 14px;
+    border-bottom:1px solid var(--rule); gap:8px;
+  }
+  .row:last-child{ border-bottom:none; }
+  .row .day{
+    width:74px; flex:0 0 auto; font-size:13px; color:var(--ink-soft);
+    text-transform:uppercase; letter-spacing:0.3px;
+  }
+  .row input{
+    font-size:16px; padding:8px 10px; border:1px solid var(--rule);
+    border-radius:8px; background:var(--paper); color:var(--ink); font-family:inherit;
+  }
+  .row input:focus{ outline:none; border-color:var(--accent); background:var(--paper-raised); }
+  .row.hours input{ flex:1; text-align:right; }
+  .row .unit{ width:28px; flex:0 0 auto; font-size:13px; color:var(--ink-soft); text-align:right; }
+
+  .row.clock{ flex-wrap:wrap; }
+  .row .time-group{ display:flex; align-items:center; gap:6px; flex:1; min-width:190px; }
+  .row input[type="time"]{ flex:1; min-width:80px; text-align:center; font-size:15px; padding:8px 4px; }
+  .row .arrow{ color:var(--ink-soft); font-size:13px; flex:0 0 auto; }
+  .row .badge{
+    font-size:13px; font-weight:600; color:var(--accent);
+    flex:0 0 auto; min-width:58px; text-align:right;
+  }
+
+  /* ---- paystub ---- */
+  .pay-body{ padding:6px 14px 14px; }
+  .pay-row{ display:flex; justify-content:space-between; padding:6px 0; font-size:14px; }
+  .pay-row.strong{ font-weight:700; font-size:16px; }
+  .pay-row .sub{ color:var(--ink-soft); font-size:13px; }
+  .pay-hr{ border:none; border-top:1px solid var(--rule); margin:4px 0; }
+  .pay-note{ font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.4; }
+
+  /* ---- actions ---- */
+  .actions{ display:flex; gap:10px; padding:18px 18px 0; }
+  .actions button{
+    flex:1; font-size:14px; font-weight:600; padding:12px; border-radius:10px;
+    border:1px solid var(--rule); background:var(--paper-raised); color:var(--ink); font-family:inherit;
+  }
+  .actions button:active{ background:var(--rule); }
+  .actions button.primary{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .actions button.confirming{ background:var(--warn); color:#fff; border-color:var(--warn); }
+  .hint{ font-size:12px; color:var(--ink-soft); text-align:center; padding:14px 18px 0; line-height:1.5; }
+</style>
+</head>
+<body>
+
+  <div class="summary">
+    <div class="summary-top">
+      <h1>Hours Tracker</h1>
+      <div class="summary-total"><span id="totalVal" class="num">0</span><span>hrs / <span id="targetEcho" class="num">80</span></span></div>
+    </div>
+    <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+    <div class="meter-caption">
+      <span id="rangeLabel">—</span>
+      <span id="remainLabel"></span>
+    </div>
+  </div>
+
+  <div class="settings">
+    <div class="field">
+      <label for="startDate">Period start</label>
+      <input type="date" id="startDate">
+    </div>
+    <div class="field">
+      <label for="target">Target hours</label>
+      <input type="number" id="target" inputmode="decimal" min="0" step="1">
+    </div>
+    <div class="field">
+      <label for="rate">Pay rate ($/hr)</label>
+      <input type="number" id="rate" inputmode="decimal" min="0" step="0.01">
+    </div>
+    <div class="field">
+      <label for="taxRate">Tax rate (%)</label>
+      <input type="number" id="taxRate" inputmode="decimal" min="0" max="100" step="0.01">
+    </div>
+  </div>
+
+  <div class="seg" id="modeToggle">
+    <button class="seg-btn active" data-mode="hours" type="button">Hours</button>
+    <button class="seg-btn" data-mode="clock" type="button">Clock In/Out</button>
+  </div>
+
+  <main>
+    <section class="week" id="week1">
+      <div class="week-head">
+        <h2>Week 1</h2>
+        <div class="week-total"><span class="num" id="week1Total">0</span> hrs<span class="ot-pill" id="week1OT" hidden>OT</span></div>
+      </div>
+      <div class="rows" id="week1Rows"></div>
+    </section>
+
+    <section class="week" id="week2">
+      <div class="week-head">
+        <h2>Week 2</h2>
+        <div class="week-total"><span class="num" id="week2Total">0</span> hrs<span class="ot-pill" id="week2OT" hidden>OT</span></div>
+      </div>
+      <div class="rows" id="week2Rows"></div>
+    </section>
+
+    <section class="week" id="paystub">
+      <div class="week-head">
+        <h2>Paystub Prediction</h2>
+      </div>
+      <div class="pay-body">
+        <div class="pay-row"><span>Week 1 worked</span><span id="ps_w1worked" class="num">0 hrs</span></div>
+        <div class="pay-row sub" id="ps_w1carry_row" hidden><span id="ps_w1carry_label">→ carried to Week 2</span><span id="ps_w1carry" class="num">0 hrs</span></div>
+        <div class="pay-row"><span>Week 1 taxable</span><span id="ps_w1tax" class="num">0 hrs</span></div>
+        <hr class="pay-hr">
+        <div class="pay-row"><span>Week 2 worked</span><span id="ps_w2worked" class="num">0 hrs</span></div>
+        <div class="pay-row"><span>Week 2 taxable</span><span id="ps_w2tax" class="num">0 hrs</span></div>
+        <div class="pay-row sub" id="ps_untaxed_row" hidden><span>Untaxed extra (paid, no withholding)</span><span id="ps_untaxed" class="num">0 hrs</span></div>
+        <hr class="pay-hr">
+        <div class="pay-row strong"><span>Gross pay</span><span id="ps_gross" class="num">$0.00</span></div>
+        <div class="pay-row"><span>Estimated tax withheld</span><span id="ps_tax" class="num">−$0.00</span></div>
+        <div class="pay-row strong"><span>Estimated net pay</span><span id="ps_net" class="num">$0.00</span></div>
+        <p class="pay-note">Estimate only: straight pay rate on all hours, tax withheld on up to 40 taxable hrs/week. Hours over 40 in one week shift to fill spare room in the other week (whichever direction applies); anything that still doesn't fit is paid without withholding. Actual paystub may vary with deductions or rounding.</p>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="clearBtn" type="button">Clear hours</button>
+      <button id="newPeriodBtn" class="primary" type="button">Start new period</button>
+    </div>
+    <p class="hint">Hours and settings save automatically on this phone. Switch between typing total hours and clocking in/out above. Clear hours / Start new period need two taps to confirm. If inputs don't respond, open this file in Safari (Share → Open in Safari) rather than previewing it in Files or Messages.</p>
+  </main>
+
+<script>
+(function(){
+  var KEY = 'hoursTrackerV2';
+  var mode = 'hours';
+  var dayData = [];
+  for (var k = 0; k < 14; k++) { dayData.push({ hours: '', clockIn: '', clockOut: '' }); }
+
+  function pad(n){ return n < 10 ? '0' + n : '' + n; }
+
+  function defaultStart(){
+    var d = new Date();
+    var dow = d.getDay();
+    var diff = (dow === 0) ? -6 : (1 - dow);
+    d.setDate(d.getDate() + diff);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(!raw) return null;
+      var parsed = JSON.parse(raw);
+      if(!parsed) return null;
+      if(Array.isArray(parsed.days) && parsed.days.length === 14) return parsed;
+      return null;
+    }catch(e){ return null; }
+  }
+
+  function migrateOld(){
+    try{
+      var raw = localStorage.getItem('hoursTrackerV1');
+      if(!raw) return null;
+      var parsed = JSON.parse(raw);
+      if(!parsed || !Array.isArray(parsed.hours) || parsed.hours.length !== 14) return null;
+      var days = [];
+      for(var i = 0; i < 14; i++){ days.push({ hours: parsed.hours[i] || '', clockIn: '', clockOut: '' }); }
+      return { startDate: parsed.startDate, target: parsed.target, rate: 16.5, taxRate: 12.5, mode: 'hours', days: days };
+    }catch(e){ return null; }
+  }
+
+  function saveState(){
+    var state = {
+      startDate: document.getElementById('startDate').value,
+      target: document.getElementById('target').value,
+      rate: document.getElementById('rate').value,
+      taxRate: document.getElementById('taxRate').value,
+      mode: mode,
+      days: dayData
+    };
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  function utcDatePlusDays(y, m, d, offset){ return new Date(Date.UTC(y, m - 1, d + offset)); }
+
+  function formatDate(dt){
+    return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric', timeZone: 'UTC' });
+  }
+  function formatShort(dt){
+    return dt.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  function renderDates(){
+    var val = document.getElementById('startDate').value;
+    if(!val) return;
+    var parts = val.split('-').map(Number);
+    var y = parts[0], m = parts[1], d = parts[2];
+    for(var i = 0; i < 14; i++){
+      var dt = utcDatePlusDays(y, m, d, i);
+      var label = document.querySelector('[data-label="' + i + '"]');
+      if(label) label.textContent = formatDate(dt);
+    }
+    document.getElementById('rangeLabel').textContent =
+      formatShort(utcDatePlusDays(y, m, d, 0)) + ' – ' + formatShort(utcDatePlusDays(y, m, d, 13));
+  }
+
+  function fmtHours(n){
+    var r = Math.round(n * 100) / 100;
+    return String(r);
+  }
+  function fmtMoney(n){
+    var r = Math.round(n * 100) / 100;
+    return '$' + r.toFixed(2);
+  }
+
+  function computeFromClock(inStr, outStr){
+    if(!inStr || !outStr) return 0;
+    var inParts = inStr.split(':').map(Number);
+    var outParts = outStr.split(':').map(Number);
+    if(inParts.length < 2 || outParts.length < 2) return 0;
+    var inMin = inParts[0] * 60 + inParts[1];
+    var outMin = outParts[0] * 60 + outParts[1];
+    var diff = outMin - inMin;
+    if(diff <= 0) diff += 24 * 60;
+    return Math.round((diff / 60) * 100) / 100;
+  }
+
+  function getDayHours(i){
+    if(mode === 'clock'){ return computeFromClock(dayData[i].clockIn, dayData[i].clockOut); }
+    var v = parseFloat(dayData[i].hours);
+    return (!isNaN(v) && v > 0) ? v : 0;
+  }
+
+  function sumRange(s, e){
+    var t = 0;
+    for(var i = s; i <= e; i++){ t += getDayHours(i); }
+    return t;
+  }
+
+  function buildHoursRow(i){
+    var row = document.createElement('div');
+    row.className = 'row hours';
+
+    var dayEl = document.createElement('div');
+    dayEl.className = 'day';
+    dayEl.setAttribute('data-label', i);
+    dayEl.textContent = '—';
+
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.inputMode = 'decimal';
+    input.min = '0';
+    input.max = '24';
+    input.step = '0.25';
+    input.placeholder = '0';
+    input.value = dayData[i].hours || '';
+    input.addEventListener('input', function(){
+      dayData[i].hours = input.value;
+      recompute();
+      saveState();
+    });
+
+    var unit = document.createElement('div');
+    unit.className = 'unit';
+    unit.textContent = 'hrs';
+
+    row.appendChild(dayEl);
+    row.appendChild(input);
+    row.appendChild(unit);
+    return row;
+  }
+
+  function buildClockRow(i){
+    var row = document.createElement('div');
+    row.className = 'row clock';
+
+    var dayEl = document.createElement('div');
+    dayEl.className = 'day';
+    dayEl.setAttribute('data-label', i);
+    dayEl.textContent = '—';
+
+    var group = document.createElement('div');
+    group.className = 'time-group';
+
+    var inTime = document.createElement('input');
+    inTime.type = 'time';
+    inTime.value = dayData[i].clockIn || '';
+
+    var arrow = document.createElement('div');
+    arrow.className = 'arrow';
+    arrow.textContent = String.fromCharCode(8594);
+
+    var outTime = document.createElement('input');
+    outTime.type = 'time';
+    outTime.value = dayData[i].clockOut || '';
+
+    var badge = document.createElement('div');
+    badge.className = 'badge';
+
+    function updateBadge(){
+      if(dayData[i].clockIn && dayData[i].clockOut){
+        badge.textContent = fmtHours(computeFromClock(dayData[i].clockIn, dayData[i].clockOut)) + ' hrs';
+      } else {
+        badge.textContent = '—';
+      }
+    }
+    updateBadge();
+
+    inTime.addEventListener('input', function(){
+      dayData[i].clockIn = inTime.value;
+      updateBadge();
+      recompute();
+      saveState();
+    });
+    outTime.addEventListener('input', function(){
+      dayData[i].clockOut = outTime.value;
+      updateBadge();
+      recompute();
+      saveState();
+    });
+
+    group.appendChild(inTime);
+    group.appendChild(arrow);
+    group.appendChild(outTime);
+
+    row.appendChild(dayEl);
+    row.appendChild(group);
+    row.appendChild(badge);
+    return row;
+  }
+
+  function renderRows(){
+    var w1 = document.getElementById('week1Rows');
+    var w2 = document.getElementById('week2Rows');
+    w1.innerHTML = '';
+    w2.innerHTML = '';
+    for(var i = 0; i < 14; i++){
+      var row = (mode === 'clock') ? buildClockRow(i) : buildHoursRow(i);
+      (i < 7 ? w1 : w2).appendChild(row);
+    }
+  }
+
+  function recompute(){
+    var w1 = sumRange(0, 6);
+    var w2 = sumRange(7, 13);
+    var total = w1 + w2;
+
+    var target = parseFloat(document.getElementById('target').value);
+    if(isNaN(target) || target < 0) target = 0;
+
+    document.getElementById('week1Total').textContent = fmtHours(w1);
+    document.getElementById('week2Total').textContent = fmtHours(w2);
+    document.getElementById('totalVal').textContent = fmtHours(total);
+    document.getElementById('targetEcho').textContent = fmtHours(target);
+
+    document.getElementById('week1OT').hidden = !(w1 > 40);
+    document.getElementById('week2OT').hidden = !(w2 > 40);
+
+    var pct = target > 0 ? Math.min(100, (total / target) * 100) : 0;
+    var fill = document.getElementById('meterFill');
+    fill.style.width = pct + '%';
+    fill.classList.toggle('over', target > 0 && total > target);
+
+    var remainLabel = document.getElementById('remainLabel');
+    if(target > 0){
+      var diff = target - total;
+      remainLabel.textContent = diff > 0 ? fmtHours(diff) + ' hrs to go' : fmtHours(Math.abs(diff)) + ' hrs over';
+    } else {
+      remainLabel.textContent = '';
+    }
+
+    // ---- paystub prediction ----
+    var rate = parseFloat(document.getElementById('rate').value);
+    if(isNaN(rate) || rate < 0) rate = 0;
+    var taxPct = parseFloat(document.getElementById('taxRate').value);
+    if(isNaN(taxPct) || taxPct < 0) taxPct = 0;
+
+    var overage1 = Math.max(0, w1 - 40);
+    var week1Taxable, week2Taxable, untaxedExtra, carryForward, carryBack;
+
+    if(overage1 > 0){
+      // Week 1 ran over 40: shift the excess into Week 2's room.
+      week1Taxable = 40;
+      var week2Eff = w2 + overage1;
+      week2Taxable = Math.min(week2Eff, 40);
+      untaxedExtra = Math.max(0, week2Eff - 40);
+      carryForward = overage1;
+      carryBack = 0;
+    } else {
+      var room1 = 40 - w1;
+      var overage2 = Math.max(0, w2 - 40);
+      if(overage2 > 0){
+        // Week 2 ran over 40: shift what fits back into Week 1's spare room.
+        var shiftBack = Math.min(overage2, room1);
+        week1Taxable = w1 + shiftBack;
+        week2Taxable = 40;
+        untaxedExtra = overage2 - shiftBack;
+        carryForward = 0;
+        carryBack = shiftBack;
+      } else {
+        week1Taxable = w1;
+        week2Taxable = w2;
+        untaxedExtra = 0;
+        carryForward = 0;
+        carryBack = 0;
+      }
+    }
+
+    var totalTaxableHours = week1Taxable + week2Taxable;
+    var grossPay = total * rate;
+    var taxWithheld = totalTaxableHours * rate * (taxPct / 100);
+    var netPay = grossPay - taxWithheld;
+
+    document.getElementById('ps_w1worked').textContent = fmtHours(w1) + ' hrs';
+    document.getElementById('ps_w1tax').textContent = fmtHours(week1Taxable) + ' hrs';
+    var carryRow = document.getElementById('ps_w1carry_row');
+    var carryLabel = document.getElementById('ps_w1carry_label');
+    // Always reset first to prevent stale display after clear
+    carryRow.hidden = true;
+    document.getElementById('ps_w1carry').textContent = '0 hrs';
+    if(carryForward > 0){
+      carryRow.hidden = false;
+      carryLabel.textContent = String.fromCharCode(8594) + ' carried to Week 2';
+      document.getElementById('ps_w1carry').textContent = fmtHours(carryForward) + ' hrs';
+    } else if(carryBack > 0){
+      carryRow.hidden = false;
+      carryLabel.textContent = String.fromCharCode(8592) + ' carried from Week 2';
+      document.getElementById('ps_w1carry').textContent = fmtHours(carryBack) + ' hrs';
+    }
+
+    document.getElementById('ps_w2worked').textContent = fmtHours(w2) + ' hrs';
+    document.getElementById('ps_w2tax').textContent = fmtHours(week2Taxable) + ' hrs';
+    var untaxedRow = document.getElementById('ps_untaxed_row');
+    // Always reset first to prevent stale display from prior session
+    untaxedRow.hidden = true;
+    document.getElementById('ps_untaxed').textContent = '0 hrs';
+    if(untaxedExtra > 0){
+      untaxedRow.hidden = false;
+      document.getElementById('ps_untaxed').textContent = fmtHours(untaxedExtra) + ' hrs';
+    }
+
+    document.getElementById('ps_gross').textContent = fmtMoney(grossPay);
+    document.getElementById('ps_tax').textContent = String.fromCharCode(8722) + fmtMoney(taxWithheld);
+    document.getElementById('ps_net').textContent = fmtMoney(netPay);
+  }
+
+  function resetDayData(){
+    dayData = [];
+    for(var i = 0; i < 14; i++){ dayData.push({ hours: '', clockIn: '', clockOut: '' }); }
+  }
+
+  function setModeButtons(){
+    var btns = document.querySelectorAll('.seg-btn');
+    for(var i = 0; i < btns.length; i++){
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-mode') === mode);
+    }
+  }
+
+  function init(){
+    var state = loadState() || migrateOld();
+
+    document.getElementById('startDate').value = (state && state.startDate) ? state.startDate : defaultStart();
+    document.getElementById('target').value = (state && state.target) ? state.target : 80;
+    document.getElementById('rate').value = (state && state.rate != null && state.rate !== '') ? state.rate : 16.5;
+    document.getElementById('taxRate').value = (state && state.taxRate != null && state.taxRate !== '') ? state.taxRate : 12.46;
+    mode = (state && state.mode) ? state.mode : 'hours';
+
+    if(state && Array.isArray(state.days) && state.days.length === 14){
+      dayData = state.days.map(function(d){
+        return { hours: d.hours || '', clockIn: d.clockIn || '', clockOut: d.clockOut || '' };
+      });
+    }
+
+    setModeButtons();
+    renderRows();
+    renderDates();
+    recompute();
+    saveState();
+
+    document.getElementById('startDate').addEventListener('change', function(){
+      renderDates();
+      saveState();
+    });
+    document.getElementById('target').addEventListener('input', function(){ recompute(); saveState(); });
+    document.getElementById('rate').addEventListener('input', function(){ recompute(); saveState(); });
+    document.getElementById('taxRate').addEventListener('input', function(){ recompute(); saveState(); });
+
+    var segBtns = document.querySelectorAll('.seg-btn');
+    for(var i = 0; i < segBtns.length; i++){
+      segBtns[i].addEventListener('click', function(){
+        mode = this.getAttribute('data-mode');
+        setModeButtons();
+        renderRows();
+        renderDates();
+        recompute();
+        saveState();
+      });
+    }
+
+    armConfirm(document.getElementById('clearBtn'), 'Clear hours', function(){
+      resetDayData();
+      renderRows();
+      renderDates();
+      recompute();
+      saveState();
+    });
+
+    armConfirm(document.getElementById('newPeriodBtn'), 'Start new period', function(){
+      var val = document.getElementById('startDate').value;
+      var parts = val.split('-').map(Number);
+      var next = utcDatePlusDays(parts[0], parts[1], parts[2], 14);
+      var y = next.getUTCFullYear(), m = next.getUTCMonth() + 1, d = next.getUTCDate();
+      document.getElementById('startDate').value = y + '-' + pad(m) + '-' + pad(d);
+      resetDayData();
+      renderRows();
+      renderDates();
+      recompute();
+      saveState();
+    });
+  }
+
+  function armConfirm(btn, restingLabel, onConfirm){
+    var armed = false;
+    var timer = null;
+    btn.addEventListener('click', function(){
+      if(!armed){
+        armed = true;
+        btn.textContent = 'Tap again to confirm';
+        btn.classList.add('confirming');
+        timer = setTimeout(function(){
+          armed = false;
+          btn.textContent = restingLabel;
+          btn.classList.remove('confirming');
+        }, 3000);
+      } else {
+        armed = false;
+        clearTimeout(timer);
+        btn.textContent = restingLabel;
+        btn.classList.remove('confirming');
+        onConfirm();
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  // Register service worker for offline PWA support
+  if ('serviceWorker' in navigator) {
+    var swBlob = new Blob([`
+      self.addEventListener('install', function(e){ self.skipWaiting(); });
+      self.addEventListener('fetch', function(e){ e.respondWith(caches.match(e.request).then(function(r){ return r || fetch(e.request); })); });
+    `], { type: 'application/javascript' });
+    var swUrl = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl).catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>
